@@ -1,9 +1,28 @@
 import { ExtensionContext, Immutable, MessageEvent } from "@foxglove/extension";
 
 import { initTrailControlPanel } from "./TrailControlPanel";
-import { getTrailConfigForTopic } from "./trailRuntimeConfig";
+import { getTrailConfigForTopic, TrailRuntimeConfig } from "./trailRuntimeConfig";
 
 type Quaternion = { x: number; y: number; z: number; w: number };
+
+type PoseSnapshot = {
+  position: { x: number; y: number; z: number };
+  orientation: Quaternion;
+};
+
+type TrailEntitySnapshot = {
+  id: string;
+  timestamp: { sec: number; nsec: number };
+  frame_id: string;
+  pose: {
+    position: { x: number; y: number; z: number };
+    orientation: Quaternion;
+  };
+};
+
+const lastEmittedPoseByTopic = new Map<string, PoseSnapshot>();
+const trailHistoryByTopic = new Map<string, TrailEntitySnapshot[]>();
+const lastAppliedConfigByTopic = new Map<string, TrailRuntimeConfig>();
 
 type Odometry = {
   header: {
@@ -73,6 +92,62 @@ function makeTrailArrow(axisScale: number, arrowColorHex: string, arrowAlpha: nu
   };
 }
 
+function configsEqual(a: TrailRuntimeConfig, b: TrailRuntimeConfig): boolean {
+  return (
+    a.lifetimeSec === b.lifetimeSec &&
+    a.axisScale === b.axisScale &&
+    a.style === b.style &&
+    a.arrowColorHex === b.arrowColorHex &&
+    a.arrowAlpha === b.arrowAlpha &&
+    a.minPositionDelta === b.minPositionDelta &&
+    a.minRotationDeltaDeg === b.minRotationDeltaDeg
+  );
+}
+
+function stampToNanoseconds(stamp: { sec: number; nsec: number }): number {
+  return stamp.sec * 1_000_000_000 + stamp.nsec;
+}
+
+function pruneHistory(
+  history: TrailEntitySnapshot[],
+  nowStamp: { sec: number; nsec: number },
+  lifetimeSec: number,
+): TrailEntitySnapshot[] {
+  const nowNs = stampToNanoseconds(nowStamp);
+  const keepWindowNs = Math.round(lifetimeSec * 1_000_000_000);
+  return history.filter((entry) => nowNs - stampToNanoseconds(entry.timestamp) <= keepWindowNs);
+}
+
+function makeTrailEntityFromSnapshot(snapshot: TrailEntitySnapshot, config: TrailRuntimeConfig) {
+  return {
+    timestamp: snapshot.timestamp,
+    frame_id: snapshot.frame_id,
+    id: snapshot.id,
+    lifetime: makeTrailLifetime(config.lifetimeSec),
+    frame_locked: true,
+    arrows:
+      config.style === "axes"
+        ? makeAxesArrows(
+            {
+              header: {
+                stamp: snapshot.timestamp,
+                frame_id: snapshot.frame_id,
+              },
+              pose: {
+                pose: snapshot.pose,
+              },
+            },
+            config.axisScale,
+          )
+        : [
+            {
+              pose: snapshot.pose,
+              ...makeTrailArrow(config.axisScale, config.arrowColorHex, config.arrowAlpha),
+            },
+          ],
+  };
+}
+
 function multiplyQuat(a: Quaternion, b: Quaternion): Quaternion {
   return {
     w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
@@ -125,6 +200,43 @@ function makeAxesArrows(msg: Odometry, axisScale: number) {
   ];
 }
 
+function positionDistance(a: PoseSnapshot["position"], b: PoseSnapshot["position"]): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  const dz = a.z - b.z;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function rotationDistanceDeg(a: Quaternion, b: Quaternion): number {
+  const dot = Math.abs(a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w);
+  const clamped = Math.max(-1, Math.min(1, dot));
+  const angleRad = 2 * Math.acos(clamped);
+  return (angleRad * 180) / Math.PI;
+}
+
+function shouldEmitForTopic(topicName: string, msg: Odometry, minPositionDelta: number, minRotationDeltaDeg: number): boolean {
+  const current: PoseSnapshot = {
+    position: msg.pose.pose.position,
+    orientation: msg.pose.pose.orientation,
+  };
+
+  const previous = lastEmittedPoseByTopic.get(topicName);
+  if (!previous) {
+    lastEmittedPoseByTopic.set(topicName, current);
+    return true;
+  }
+
+  const movedEnough = positionDistance(current.position, previous.position) >= minPositionDelta;
+  const rotatedEnough = rotationDistanceDeg(current.orientation, previous.orientation) >= minRotationDeltaDeg;
+
+  const shouldEmit = movedEnough || rotatedEnough;
+  if (shouldEmit) {
+    lastEmittedPoseByTopic.set(topicName, current);
+  }
+
+  return shouldEmit;
+}
+
 export function activate(extensionContext: ExtensionContext): void {
   extensionContext.registerPanel({
     name: "🧭 Odometry Trail Settings",
@@ -148,29 +260,51 @@ export function activate(extensionContext: ExtensionContext): void {
     fromSchemaName: "nav_msgs/msg/Odometry",
     toSchemaName: "foxglove.SceneUpdate",
     converter: (msg: Odometry, event: Immutable<MessageEvent<Odometry>>) => {
-      const { lifetimeSec, axisScale, style, arrowColorHex, arrowAlpha } =
-        getTrailConfigForTopic(event.topic);
+      const config = getTrailConfigForTopic(event.topic);
+
+      const previousConfig = lastAppliedConfigByTopic.get(event.topic);
+      const configChanged = previousConfig != undefined && !configsEqual(previousConfig, config);
+      lastAppliedConfigByTopic.set(event.topic, { ...config });
+
+      let history = trailHistoryByTopic.get(event.topic) ?? [];
+      history = pruneHistory(history, msg.header.stamp, config.lifetimeSec);
+      trailHistoryByTopic.set(event.topic, history);
+
+      const shouldEmit = shouldEmitForTopic(
+        event.topic,
+        msg,
+        config.minPositionDelta,
+        config.minRotationDeltaDeg,
+      );
+
+      if (shouldEmit) {
+        const snapshot: TrailEntitySnapshot = {
+          id: makeTrailEntityId(msg),
+          timestamp: msg.header.stamp,
+          frame_id: msg.header.frame_id,
+          pose: msg.pose.pose,
+        };
+        history.push(snapshot);
+        trailHistoryByTopic.set(event.topic, history);
+      }
+
+      if (history.length === 0) {
+        return undefined;
+      }
+
+      const entities = history.map((entry) => makeTrailEntityFromSnapshot(entry, config));
 
       return {
-        deletions: [],
-        entities: [
-          {
-            timestamp: msg.header.stamp,
-            frame_id: msg.header.frame_id,
-            id: makeTrailEntityId(msg),
-            lifetime: makeTrailLifetime(lifetimeSec),
-            frame_locked: true,
-            arrows:
-              style === "axes"
-                ? makeAxesArrows(msg, axisScale)
-                : [
-                    {
-                      pose: msg.pose.pose,
-                      ...makeTrailArrow(axisScale, arrowColorHex, arrowAlpha),
-                    },
-                  ],
-          },
-        ],
+        deletions: configChanged
+          ? [
+              {
+                timestamp: msg.header.stamp,
+                type: 1,
+                id: "",
+              },
+            ]
+          : [],
+        entities,
       };
     },
   });

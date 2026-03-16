@@ -4,6 +4,8 @@ export type TrailRuntimeConfig = {
   style: "arrow" | "axes";
   arrowColorHex: string;
   arrowAlpha: number;
+  minPositionDelta: number;
+  minRotationDeltaDeg: number;
 };
 
 export type TrailRuntimeConfigMap = Record<string, TrailRuntimeConfig>;
@@ -14,6 +16,8 @@ type TrailRuntimeConfigInput = {
   style?: unknown;
   arrowColorHex?: unknown;
   arrowAlpha?: unknown;
+  minPositionDelta?: unknown;
+  minRotationDeltaDeg?: unknown;
 };
 
 const DEFAULT_CONFIG: TrailRuntimeConfig = {
@@ -22,6 +26,8 @@ const DEFAULT_CONFIG: TrailRuntimeConfig = {
   style: "arrow",
   arrowColorHex: "#19b3ff",
   arrowAlpha: 0.9,
+  minPositionDelta: 0.03,
+  minRotationDeltaDeg: 1,
 };
 
 const STORAGE_KEY = "odom-converter.trail-configs.v1";
@@ -113,6 +119,12 @@ export function normalizeTrailConfig(state: TrailRuntimeConfigInput | undefined)
     style: parseStyle(state?.style, DEFAULT_CONFIG.style),
     arrowColorHex: parseColorHex(state?.arrowColorHex, DEFAULT_CONFIG.arrowColorHex),
     arrowAlpha: clamp(parseNumber(state?.arrowAlpha, DEFAULT_CONFIG.arrowAlpha), 0, 1),
+    minPositionDelta: clamp(parseNumber(state?.minPositionDelta, DEFAULT_CONFIG.minPositionDelta), 0, 10),
+    minRotationDeltaDeg: clamp(
+      parseNumber(state?.minRotationDeltaDeg, DEFAULT_CONFIG.minRotationDeltaDeg),
+      0,
+      180,
+    ),
   };
 }
 

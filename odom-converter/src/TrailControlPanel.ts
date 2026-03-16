@@ -3,14 +3,9 @@ import { PanelExtensionContext, Topic } from "@foxglove/extension";
 import {
   getAllTrailConfigs,
   getTrailConfigForTopic,
-  replaceAllTrailConfigs,
   setTrailConfigForTopic,
   TrailRuntimeConfig,
 } from "./trailRuntimeConfig";
-
-type PanelState = {
-  topics: Record<string, TrailRuntimeConfig>;
-};
 
 function createLabel(text: string): HTMLLabelElement {
   const label = document.createElement("label");
@@ -106,6 +101,16 @@ function initTopicRow(args: {
   opacityInput.value = config.arrowAlpha.toString();
   opacityLabel.appendChild(opacityInput);
 
+  const posTolLabel = createLabel("Position tolerance (m)");
+  const posTolInput = createNumberInput("0", "10", "0.01");
+  posTolInput.value = config.minPositionDelta.toString();
+  posTolLabel.appendChild(posTolInput);
+
+  const rotTolLabel = createLabel("Rotation tolerance (deg)");
+  const rotTolInput = createNumberInput("0", "180", "0.5");
+  rotTolInput.value = config.minRotationDeltaDeg.toString();
+  rotTolLabel.appendChild(rotTolInput);
+
   const footer = document.createElement("div");
   footer.style.gridColumn = "1 / -1";
   footer.style.fontSize = "11px";
@@ -130,6 +135,8 @@ function initTopicRow(args: {
       style: styleSelect.value as TrailRuntimeConfig["style"],
       arrowColorHex: colorInput.value,
       arrowAlpha: Number(opacityInput.value),
+      minPositionDelta: Number(posTolInput.value),
+      minRotationDeltaDeg: Number(rotTolInput.value),
     });
     refreshArrowControls();
   };
@@ -139,6 +146,8 @@ function initTopicRow(args: {
   styleSelect.addEventListener("change", emitChange);
   colorInput.addEventListener("change", emitChange);
   opacityInput.addEventListener("change", emitChange);
+  posTolInput.addEventListener("change", emitChange);
+  rotTolInput.addEventListener("change", emitChange);
 
   refreshArrowControls();
 
@@ -148,6 +157,8 @@ function initTopicRow(args: {
   card.appendChild(styleLabel);
   card.appendChild(colorLabel);
   card.appendChild(opacityLabel);
+  card.appendChild(posTolLabel);
+  card.appendChild(rotTolLabel);
   card.appendChild(footer);
 
   return card;
@@ -184,9 +195,6 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
   root.appendChild(help);
   root.appendChild(topicList);
   context.panelElement.appendChild(root);
-
-  const initialState = (context.initialState as Partial<PanelState> | undefined)?.topics;
-  replaceAllTrailConfigs(initialState);
 
   let currentTopics: readonly Topic[] = [];
 
@@ -232,7 +240,6 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
   };
 
   context.watch("topics");
-  persistState();
   renderTopics();
 
   return () => {

@@ -32,6 +32,28 @@ No `npm` or local build is required for this path.
 4. In a panel schema picker, choose/confirm the converted output `geometry_msgs/msg/PoseStamped`.
 5. In the 3D panel, you can also choose the converted output `foxglove.SceneUpdate` to see a breadcrumb trail of recent odometry poses.
 
+## How to use (step-by-step in Foxglove)
+
+1. Create or open a layout with odometry data (`nav_msgs/msg/Odometry`).
+2. Add a **3D** panel.
+3. In the 3D panel topic list, enable your odometry topic using converted schema **`foxglove.SceneUpdate`**.
+4. Add a new panel: **🧭 Odometry Trail Settings**.
+5. In that panel, find the card for your odometry topic.
+6. Tune the trail parameters as needed:
+   - **Trail lifetime (s)**
+   - **Trail scale**
+   - **Style** (`Arrow` or `Axes`)
+   - **Arrow color** and **Arrow opacity** (only for `Arrow` style)
+   - **Position tolerance (m)**
+   - **Rotation tolerance (deg)**
+7. Switch back to the 3D panel to inspect the result. You can keep both panels open side-by-side for live tuning.
+
+Tips:
+
+- Set both tolerances to very small values if you want to see almost every odometry sample.
+- Higher tolerance values reduce jitter and reduce the number of displayed trail points.
+- Settings are stored per odometry topic.
+
 ## Where are the knobs?
 
 The extension now provides a custom panel named **🧭 Odometry Trail Settings**.
