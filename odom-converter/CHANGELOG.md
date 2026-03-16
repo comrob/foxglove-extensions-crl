@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Added trail style control: `Arrow` or `Axes`.
+- Added arrow color picker and opacity control (applies in `Arrow` style).
+- Kept live runtime updates via the `Odometry trail controls` panel.
+
 ## 0.3.1
 
 - Removed alias-encoded trail topic names (no more `__odom_trail/...` entries in 3D topic list).

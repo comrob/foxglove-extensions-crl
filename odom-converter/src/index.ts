@@ -3,14 +3,7 @@ import { ExtensionContext } from "@foxglove/extension";
 import { initTrailControlPanel } from "./TrailControlPanel";
 import { getTrailConfig } from "./trailRuntimeConfig";
 
-const TRAIL_CONFIG = {
-  color: {
-    r: 0.1,
-    g: 0.7,
-    b: 1.0,
-    a: 0.9,
-  },
-} as const;
+type Quaternion = { x: number; y: number; z: number; w: number };
 
 type Odometry = {
   header: {
@@ -53,16 +46,83 @@ function makeTrailLifetime(lifetimeSec: number) {
   };
 }
 
-function makeTrailArrow(axisScale: number) {
+function hexToRgb(hexColor: string): { r: number; g: number; b: number } {
+  const hex = hexColor.replace("#", "");
+  const value = Number.parseInt(hex, 16);
+  const r = ((value >> 16) & 0xff) / 255;
+  const g = ((value >> 8) & 0xff) / 255;
+  const b = (value & 0xff) / 255;
+  return { r, g, b };
+}
+
+function makeTrailArrow(axisScale: number, arrowColorHex: string, arrowAlpha: number) {
   const shaftLength = axisScale;
+  const rgb = hexToRgb(arrowColorHex);
 
   return {
     shaft_length: shaftLength,
     shaft_diameter: shaftLength * 0.1,
     head_length: shaftLength * (1 / 3),
     head_diameter: shaftLength * 0.2,
-    color: TRAIL_CONFIG.color,
+    color: {
+      r: rgb.r,
+      g: rgb.g,
+      b: rgb.b,
+      a: arrowAlpha,
+    },
   };
+}
+
+function multiplyQuat(a: Quaternion, b: Quaternion): Quaternion {
+  return {
+    w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+    x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+    y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+    z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+  };
+}
+
+function makeAxesArrows(msg: Odometry, axisScale: number) {
+  const base = msg.pose.pose.orientation;
+  const s = Math.SQRT1_2;
+
+  const rotZPlus90: Quaternion = { x: 0, y: 0, z: s, w: s };
+  const rotYMinus90: Quaternion = { x: 0, y: -s, z: 0, w: s };
+
+  const qx = base;
+  const qy = multiplyQuat(base, rotZPlus90);
+  const qz = multiplyQuat(base, rotYMinus90);
+
+  const thickness = axisScale * 0.08;
+  const headLength = axisScale * 0.28;
+  const headDiameter = axisScale * 0.18;
+
+  return [
+    {
+      pose: { position: msg.pose.pose.position, orientation: qx },
+      shaft_length: axisScale,
+      shaft_diameter: thickness,
+      head_length: headLength,
+      head_diameter: headDiameter,
+      color: { r: 1, g: 0.2, b: 0.2, a: 1 },
+    },
+    {
+      pose: { position: msg.pose.pose.position, orientation: qy },
+      shaft_length: axisScale,
+      shaft_diameter: thickness,
+      head_length: headLength,
+      head_diameter: headDiameter,
+      color: { r: 0.2, g: 1, b: 0.2, a: 1 },
+    },
+    {
+      pose: { position: msg.pose.pose.position, orientation: qz },
+      shaft_length: axisScale,
+      shaft_diameter: thickness,
+      head_length: headLength,
+      head_diameter: headDiameter,
+      color: { r: 0.2, g: 0.4, b: 1, a: 1 },
+    },
+  ];
 }
 
 export function activate(extensionContext: ExtensionContext): void {
@@ -88,7 +148,7 @@ export function activate(extensionContext: ExtensionContext): void {
     fromSchemaName: "nav_msgs/msg/Odometry",
     toSchemaName: "foxglove.SceneUpdate",
     converter: (msg: Odometry) => {
-      const { lifetimeSec, axisScale } = getTrailConfig();
+      const { lifetimeSec, axisScale, style, arrowColorHex, arrowAlpha } = getTrailConfig();
 
       return {
         deletions: [],
@@ -99,12 +159,15 @@ export function activate(extensionContext: ExtensionContext): void {
             id: makeTrailEntityId(msg),
             lifetime: makeTrailLifetime(lifetimeSec),
             frame_locked: true,
-            arrows: [
-              {
-                pose: msg.pose.pose,
-                ...makeTrailArrow(axisScale),
-              },
-            ],
+            arrows:
+              style === "axes"
+                ? makeAxesArrows(msg, axisScale)
+                : [
+                    {
+                      pose: msg.pose.pose,
+                      ...makeTrailArrow(axisScale, arrowColorHex, arrowAlpha),
+                    },
+                  ],
           },
         ],
       };

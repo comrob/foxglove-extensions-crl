@@ -11,14 +11,14 @@ This makes odometry topics usable in Foxglove panels that support pose schemas a
 
 Use the committed artifact:
 
-- `odom-converter/releases/local.odom-converter-0.3.1.foxe`
+- `odom-converter/releases/local.odom-converter-0.4.0.foxe`
 
 Install in Foxglove (Desktop or Web):
 
 1. Click your **user icon** (top right).
 2. Open **Extensions**.
 3. Click **Install Local Extension...**.
-4. Select `local.odom-converter-0.3.1.foxe`.
+4. Select `local.odom-converter-0.4.0.foxe`.
 
 The extension is available immediately after installation.
 
@@ -40,6 +40,8 @@ The extension now provides a custom panel named **Odometry trail controls**.
 2. Adjust:
    - **Trail lifetime (seconds)**
    - **Trail axis scale**
+   - **Trail style** (`Arrow` or `Axes`)
+   - **Arrow color** and **Arrow opacity** (active only in `Arrow` style)
 3. Keep your 3D panel subscribed to the converted `foxglove.SceneUpdate` odometry trail.
 
 Changes apply live; no rebuild/reinstall needed.
@@ -52,7 +54,7 @@ Keep this extension in:
 
 Keep the prebuilt distributable artifact in:
 
-- `foxglove_extensions/odom-converter/releases/local.odom-converter-0.3.1.foxe`
+- `foxglove_extensions/odom-converter/releases/local.odom-converter-0.4.0.foxe`
 
 ## Build from source (optional, for development)
 
@@ -69,7 +71,7 @@ Keep the prebuilt distributable artifact in:
 
 Installed extension location on Ubuntu:
 
-- `~/.foxglove-studio/extensions/local.odom-converter-0.3.1/`
+- `~/.foxglove-studio/extensions/local.odom-converter-0.4.0/`
 
 ## Can this work without installing npm?
 
@@ -79,7 +81,7 @@ Yes. This repository already includes a prebuilt `.foxe` file, which is the pref
 
 Use the committed artifact from this repo:
 
-- `odom-converter/releases/local.odom-converter-0.3.1.foxe`
+- `odom-converter/releases/local.odom-converter-0.4.0.foxe`
 
 In Foxglove (Desktop or Web), install it through:
 
@@ -128,6 +130,9 @@ The extension provides two outputs:
 - The panel writes variables:
    - `odomTrailLifetimeSec`
    - `odomTrailAxisScale`
+- `odomTrailStyle`
+- `odomTrailArrowColor`
+- `odomTrailArrowAlpha`
 - These values are applied directly by the SceneUpdate converter at runtime.
 - Topic names remain unchanged (no alias topic names are introduced).
 - Foxglove does not currently expose the 3D panel axis-scale setting directly to converters, so scale matching is still manual (via this panel knob).
