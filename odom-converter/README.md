@@ -6,6 +6,30 @@ Foxglove extension that converts:
 
 This makes odometry topics usable in Foxglove panels that support pose schemas (for example, the 3D panel).
 
+## Primary usage (recommended): install prebuilt `.foxe`
+
+Use the committed artifact:
+
+- `odom-converter/releases/local.odom-converter-0.0.1.foxe`
+
+Install in Foxglove (Desktop or Web):
+
+1. Click your **user icon** (top right).
+2. Open **Extensions**.
+3. Click **Install Local Extension...**.
+4. Select `local.odom-converter-0.0.1.foxe`.
+
+The extension is available immediately after installation.
+
+No `npm` or local build is required for this path.
+
+## Verify it is active
+
+1. In Foxglove, open **Settings** -> **Extensions**.
+2. Confirm `Odometry to Pose Converter` is listed and enabled.
+3. Load data containing `nav_msgs/msg/Odometry`.
+4. In a panel schema picker, choose/confirm the converted output `geometry_msgs/msg/PoseStamped`.
+
 ## Repository layout (recommended)
 
 Keep this extension in:
@@ -16,7 +40,7 @@ Keep the prebuilt distributable artifact in:
 
 - `foxglove_extensions/odom-converter/releases/local.odom-converter-0.0.1.foxe`
 
-## Activate on Ubuntu (from source)
+## Build from source (optional, for development)
 
 1. Open a terminal and go to this project directory (`odom-converter`).
 2. Install dependencies:
@@ -25,23 +49,15 @@ Keep the prebuilt distributable artifact in:
    - `npm run build`
 4. Install into your local Foxglove extensions folder:
    - `npm run local-install`
-5. Restart Foxglove Desktop.
-6. Open your layout and add/select your odometry topic in a panel that supports poses (for example 3D or Raw Messages), using the converted schema `geometry_msgs/msg/PoseStamped`.
+5. Open your layout and add/select your odometry topic in a panel that supports poses (for example 3D or Raw Messages), using the converted schema `geometry_msgs/msg/PoseStamped`.
 
 Installed extension location on Ubuntu:
 
 - `~/.foxglove-studio/extensions/local.odom-converter-0.0.1/`
 
-## Verify it is active
-
-1. In Foxglove Desktop, open **Settings** -> **Extensions**.
-2. Confirm `Odometry to Pose Converter` is listed and enabled.
-3. Load data containing `nav_msgs/msg/Odometry`.
-4. In a panel schema picker, choose/confirm the converted output `geometry_msgs/msg/PoseStamped`.
-
 ## Can this work without installing npm?
 
-Yes, but only if you install a **prebuilt extension artifact**.
+Yes. This repository already includes a prebuilt `.foxe` file, which is the preferred way to use this extension.
 
 ### Option A: Install a prebuilt `.foxe` package (recommended)
 
@@ -49,13 +65,14 @@ Use the committed artifact from this repo:
 
 - `odom-converter/releases/local.odom-converter-0.0.1.foxe`
 
-In Foxglove Desktop, install it through:
+In Foxglove (Desktop or Web), install it through:
 
 1. Click your **user icon** (top right).
 2. Open **Extensions**.
 3. Click **Install Local Extension...**.
 4. Select the `.foxe` file.
-5. Restart Foxglove Desktop.
+
+The extension is available immediately after installation.
 
 ### Option B: Copy a prebuilt unpacked extension directory
 
@@ -70,11 +87,11 @@ copy it to:
 
 - `~/.foxglove-studio/extensions/<publisher>.<name>-<version>/`
 
-then restart Foxglove Desktop.
+then it appears as an installed extension.
 
 ### Important limitation
 
-If you only have TypeScript source code (this repository) and no prebuilt files, you need Node.js tooling to build it at least once.
+If you only have TypeScript source code and no prebuilt files, you need Node.js tooling to build it at least once.
 
 ## Converter behavior
 
