@@ -113,8 +113,10 @@ function parseColorHex(value: unknown, fallback: string): string {
 }
 
 export function normalizeTrailConfig(state: TrailRuntimeConfigInput | undefined): TrailRuntimeConfig {
+  const lifetime = parseNumber(state?.lifetimeSec, DEFAULT_CONFIG.lifetimeSec);
+
   return {
-    lifetimeSec: clamp(parseNumber(state?.lifetimeSec, DEFAULT_CONFIG.lifetimeSec), 0.1, 120),
+    lifetimeSec: Number.isFinite(lifetime) ? Math.max(0, lifetime) : DEFAULT_CONFIG.lifetimeSec,
     axisScale: clamp(parseNumber(state?.axisScale, DEFAULT_CONFIG.axisScale), 0.05, 10),
     style: parseStyle(state?.style, DEFAULT_CONFIG.style),
     arrowColorHex: parseColorHex(state?.arrowColorHex, DEFAULT_CONFIG.arrowColorHex),

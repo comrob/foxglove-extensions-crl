@@ -18,11 +18,13 @@ function createLabel(text: string): HTMLLabelElement {
   return label;
 }
 
-function createNumberInput(min: string, max: string, step: string): HTMLInputElement {
+function createNumberInput(min: string, max: string | undefined, step: string): HTMLInputElement {
   const input = document.createElement("input");
   input.type = "number";
   input.min = min;
-  input.max = max;
+  if (max != undefined) {
+    input.max = max;
+  }
   input.step = step;
   input.style.width = "100%";
   return input;
@@ -69,7 +71,7 @@ function initTopicRow(args: {
   header.appendChild(badge);
 
   const lifetimeLabel = createLabel("Trail lifetime (s)");
-  const lifetimeInput = createNumberInput("0.1", "120", "0.1");
+  const lifetimeInput = createNumberInput("0", undefined, "0.1");
   lifetimeInput.value = config.lifetimeSec.toString();
   lifetimeLabel.appendChild(lifetimeInput);
 
@@ -199,6 +201,7 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
 
   let currentTopics: readonly Topic[] = [];
   let odomTopicNames = new Set<string>();
+  let lastOdomTopicsKey = "";
 
   const persistState = (): void => {
     context.saveState({ topics: getAllTrailConfigs() });
@@ -245,11 +248,24 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
     context.subscribe(Array.from(odomTopicNames).map((topic) => ({ topic })));
   };
 
+  const makeOdomTopicsKey = (topics: readonly Topic[]): string => {
+    return topics
+      .filter((topic) => topic.schemaName === "nav_msgs/msg/Odometry")
+      .map((topic) => topic.name)
+      .sort()
+      .join("\n");
+  };
+
   context.onRender = (renderState, done) => {
     if (renderState.topics) {
       currentTopics = renderState.topics;
-      updateSubscriptions();
-      renderTopics();
+
+      const nextKey = makeOdomTopicsKey(currentTopics);
+      if (nextKey !== lastOdomTopicsKey) {
+        lastOdomTopicsKey = nextKey;
+        updateSubscriptions();
+        renderTopics();
+      }
     }
 
     for (const messageEvent of renderState.currentFrame ?? []) {

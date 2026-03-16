@@ -108,6 +108,11 @@ export function ingestOdometryMessage(
   msg: OdometryLike,
   config: TrailRuntimeConfig,
 ): TrailEntitySnapshot[] {
+  if (config.lifetimeSec <= 0) {
+    clearTrailHistory(topicName);
+    return [];
+  }
+
   const stampNs = stampToNanoseconds(msg.header.stamp);
   const entityId = makeTrailEntityId(msg);
   const lastSeenStampNs = lastSeenStampByTopic.get(topicName);

@@ -203,6 +203,18 @@ export function activate(extensionContext: ExtensionContext): void {
       const history = getTrailHistory(event.topic);
 
       if (history.length === 0) {
+        if (configChanged) {
+          return {
+            deletions: [
+              {
+                timestamp: msg.header.stamp,
+                type: 1,
+                id: "",
+              },
+            ],
+            entities: [],
+          };
+        }
         return undefined;
       }
 
