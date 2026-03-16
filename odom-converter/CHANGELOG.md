@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.1
+
+- Removed alias-encoded trail topic names (no more `__odom_trail/...` entries in 3D topic list).
+- Fixed live panel knobs to update converter behavior directly at runtime.
+- Kept original odometry topic names while using converted `foxglove.SceneUpdate` schema.
+
+## 0.3.0
+
+- Added custom panel `Odometry trail controls` with live UI knobs for trail lifetime and axis scale.
+- Added variable-driven topic aliases so trail settings apply without rebuilding the extension.
+
+## 0.2.0
+
+- Made trail lifetime configurable via `TRAIL_CONFIG.lifetimeSec`.
+- Made trail size configurable via `TRAIL_CONFIG.axisScale`.
+- Derived arrow dimensions from a single scale setting for easier tuning.
+
+## 0.1.0
+
+- Added `foxglove.SceneUpdate` conversion for odometry breadcrumb trails in the 3D panel.
+- Keeps the original `geometry_msgs/msg/PoseStamped` conversion for current-pose visualization.
+
 ## 0.0.1
 
 - Initial Odometry -> PoseStamped schema converter.
