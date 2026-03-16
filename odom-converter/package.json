@@ -1,0 +1,21 @@
+{
+  "name": "odom-converter",
+  "displayName": "Odometry to Pose Converter",
+  "description": "Foxglove message converter for nav_msgs/msg/Odometry to geometry_msgs/msg/PoseStamped.",
+  "publisher": "local",
+  "version": "0.0.1",
+  "license": "MIT",
+  "main": "./dist/extension.js",
+  "scripts": {
+    "build": "foxglove-extension build",
+    "foxglove:prepublish": "foxglove-extension build --mode production",
+    "local-install": "foxglove-extension install",
+    "package": "foxglove-extension package"
+  },
+  "devDependencies": {
+    "@foxglove/extension": "^2.40.0",
+    "@foxglove/schemas": "^1.6.4",
+    "create-foxglove-extension": "^1.0.4",
+    "typescript": "^5.7.2"
+  }
+}
