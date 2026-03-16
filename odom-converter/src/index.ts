@@ -2,26 +2,14 @@ import { ExtensionContext, Immutable, MessageEvent } from "@foxglove/extension";
 
 import { initTrailControlPanel } from "./TrailControlPanel";
 import { getTrailConfigForTopic, TrailRuntimeConfig } from "./trailRuntimeConfig";
+import {
+  getTrailHistory,
+  ingestOdometryMessage,
+  OdometryLike,
+  TrailEntitySnapshot,
+} from "./trailRuntimeHistory";
 
 type Quaternion = { x: number; y: number; z: number; w: number };
-
-type PoseSnapshot = {
-  position: { x: number; y: number; z: number };
-  orientation: Quaternion;
-};
-
-type TrailEntitySnapshot = {
-  id: string;
-  timestamp: { sec: number; nsec: number };
-  frame_id: string;
-  pose: {
-    position: { x: number; y: number; z: number };
-    orientation: Quaternion;
-  };
-};
-
-const lastEmittedPoseByTopic = new Map<string, PoseSnapshot>();
-const trailHistoryByTopic = new Map<string, TrailEntitySnapshot[]>();
 const lastAppliedConfigByTopic = new Map<string, TrailRuntimeConfig>();
 
 type Odometry = {
@@ -49,11 +37,6 @@ type Odometry = {
     };
   };
 };
-
-function makeTrailEntityId(msg: Odometry): string {
-  const { frame_id, stamp } = msg.header;
-  return `odom-trail:${frame_id}:${stamp.sec}:${stamp.nsec}`;
-}
 
 function makeTrailLifetime(lifetimeSec: number) {
   const sec = Math.floor(lifetimeSec);
@@ -102,20 +85,6 @@ function configsEqual(a: TrailRuntimeConfig, b: TrailRuntimeConfig): boolean {
     a.minPositionDelta === b.minPositionDelta &&
     a.minRotationDeltaDeg === b.minRotationDeltaDeg
   );
-}
-
-function stampToNanoseconds(stamp: { sec: number; nsec: number }): number {
-  return stamp.sec * 1_000_000_000 + stamp.nsec;
-}
-
-function pruneHistory(
-  history: TrailEntitySnapshot[],
-  nowStamp: { sec: number; nsec: number },
-  lifetimeSec: number,
-): TrailEntitySnapshot[] {
-  const nowNs = stampToNanoseconds(nowStamp);
-  const keepWindowNs = Math.round(lifetimeSec * 1_000_000_000);
-  return history.filter((entry) => nowNs - stampToNanoseconds(entry.timestamp) <= keepWindowNs);
 }
 
 function makeTrailEntityFromSnapshot(snapshot: TrailEntitySnapshot, config: TrailRuntimeConfig) {
@@ -200,43 +169,6 @@ function makeAxesArrows(msg: Odometry, axisScale: number) {
   ];
 }
 
-function positionDistance(a: PoseSnapshot["position"], b: PoseSnapshot["position"]): number {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  const dz = a.z - b.z;
-  return Math.sqrt(dx * dx + dy * dy + dz * dz);
-}
-
-function rotationDistanceDeg(a: Quaternion, b: Quaternion): number {
-  const dot = Math.abs(a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w);
-  const clamped = Math.max(-1, Math.min(1, dot));
-  const angleRad = 2 * Math.acos(clamped);
-  return (angleRad * 180) / Math.PI;
-}
-
-function shouldEmitForTopic(topicName: string, msg: Odometry, minPositionDelta: number, minRotationDeltaDeg: number): boolean {
-  const current: PoseSnapshot = {
-    position: msg.pose.pose.position,
-    orientation: msg.pose.pose.orientation,
-  };
-
-  const previous = lastEmittedPoseByTopic.get(topicName);
-  if (!previous) {
-    lastEmittedPoseByTopic.set(topicName, current);
-    return true;
-  }
-
-  const movedEnough = positionDistance(current.position, previous.position) >= minPositionDelta;
-  const rotatedEnough = rotationDistanceDeg(current.orientation, previous.orientation) >= minRotationDeltaDeg;
-
-  const shouldEmit = movedEnough || rotatedEnough;
-  if (shouldEmit) {
-    lastEmittedPoseByTopic.set(topicName, current);
-  }
-
-  return shouldEmit;
-}
-
 export function activate(extensionContext: ExtensionContext): void {
   extensionContext.registerPanel({
     name: "🧭 Odometry Trail Settings",
@@ -266,27 +198,9 @@ export function activate(extensionContext: ExtensionContext): void {
       const configChanged = previousConfig != undefined && !configsEqual(previousConfig, config);
       lastAppliedConfigByTopic.set(event.topic, { ...config });
 
-      let history = trailHistoryByTopic.get(event.topic) ?? [];
-      history = pruneHistory(history, msg.header.stamp, config.lifetimeSec);
-      trailHistoryByTopic.set(event.topic, history);
+      ingestOdometryMessage(event.topic, msg as OdometryLike, config);
 
-      const shouldEmit = shouldEmitForTopic(
-        event.topic,
-        msg,
-        config.minPositionDelta,
-        config.minRotationDeltaDeg,
-      );
-
-      if (shouldEmit) {
-        const snapshot: TrailEntitySnapshot = {
-          id: makeTrailEntityId(msg),
-          timestamp: msg.header.stamp,
-          frame_id: msg.header.frame_id,
-          pose: msg.pose.pose,
-        };
-        history.push(snapshot);
-        trailHistoryByTopic.set(event.topic, history);
-      }
+      const history = getTrailHistory(event.topic);
 
       if (history.length === 0) {
         return undefined;

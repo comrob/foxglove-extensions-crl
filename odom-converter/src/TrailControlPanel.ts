@@ -6,6 +6,7 @@ import {
   setTrailConfigForTopic,
   TrailRuntimeConfig,
 } from "./trailRuntimeConfig";
+import { ingestOdometryMessage, OdometryLike } from "./trailRuntimeHistory";
 
 function createLabel(text: string): HTMLLabelElement {
   const label = document.createElement("label");
@@ -197,6 +198,7 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
   context.panelElement.appendChild(root);
 
   let currentTopics: readonly Topic[] = [];
+  let odomTopicNames = new Set<string>();
 
   const persistState = (): void => {
     context.saveState({ topics: getAllTrailConfigs() });
@@ -233,13 +235,40 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
     }
   };
 
+  const updateSubscriptions = (): void => {
+    odomTopicNames = new Set(
+      currentTopics
+        .filter((topic) => topic.schemaName === "nav_msgs/msg/Odometry")
+        .map((topic) => topic.name),
+    );
+
+    context.subscribe(Array.from(odomTopicNames).map((topic) => ({ topic })));
+  };
+
   context.onRender = (renderState, done) => {
-    currentTopics = renderState.topics ?? [];
-    renderTopics();
+    if (renderState.topics) {
+      currentTopics = renderState.topics;
+      updateSubscriptions();
+      renderTopics();
+    }
+
+    for (const messageEvent of renderState.currentFrame ?? []) {
+      if (!odomTopicNames.has(messageEvent.topic)) {
+        continue;
+      }
+
+      ingestOdometryMessage(
+        messageEvent.topic,
+        messageEvent.message as OdometryLike,
+        getTrailConfigForTopic(messageEvent.topic),
+      );
+    }
+
     done();
   };
 
   context.watch("topics");
+  context.watch("currentFrame");
   renderTopics();
 
   return () => {
