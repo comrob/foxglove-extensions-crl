@@ -11,7 +11,7 @@ This makes odometry topics usable in Foxglove panels that support pose schemas a
 
 ### Main showcase
 
-<img src="https://github.com/user-attachments/assets/575081f3-f386-4536-8f98-9cca0cb8882b" alt="Arrow-style trajectory" width="780" />
+<img src="https://github.com/user-attachments/assets/9f49da04-9836-470d-9e68-a217dc7608a6" alt="Arrow-style trajectory" width="780" />
 
 **Arrow-style trajectory**
 
